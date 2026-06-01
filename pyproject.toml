@@ -13,7 +13,7 @@ authors = [
     {name = "Petr Stichauer", email = "petr.stichauer@gmail.com"}
 ]
 dependencies = [
-    "mcp>=1.0.0",
+    "mcp>=1.27.2",
     "python-dotenv>=1.0.0",
 ]
 
