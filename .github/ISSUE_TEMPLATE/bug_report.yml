@@ -1,0 +1,37 @@
+name: Bug report
+description: Report a problem with Odoo MCP Server
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Describe the bug and expected behavior.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: odoo-mcp-server version
+      placeholder: "0.2.0"
+  - type: input
+    id: odoo_version
+    attributes:
+      label: Odoo version
+      placeholder: "17.0"
+  - type: dropdown
+    id: connection_method
+    attributes:
+      label: Connection method
+      options:
+        - Named profile (connections.json)
+        - Environment variables (ODOO_*)
+        - Both / not sure
+  - type: textarea
+    id: logs
+    attributes:
+      label: Error output
+      description: Output from `odoo-mcp-server test` or MCP tool error (redact secrets).
+    validations:
+      required: true

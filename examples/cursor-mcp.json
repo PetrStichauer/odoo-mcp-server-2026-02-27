@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "odoo": {
+      "command": "odoo-mcp-server",
+      "args": [],
+      "env": {
+        "ODOO_CONNECTION": "production"
+      }
+    },
+    "odoo-staging": {
+      "command": "odoo-mcp-server",
+      "args": [],
+      "env": {
+        "ODOO_CONNECTION": "staging"
+      }
+    }
+  }
+}

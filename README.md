@@ -1,229 +1,190 @@
 # Odoo MCP Server
 
-A Model Context Protocol (MCP) server that exposes Odoo ERP functionality as tools for AI agents.
+[![CI](https://github.com/PetrStichauer/odoo-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/PetrStichauer/odoo-mcp-server/actions/workflows/ci.yml)
+![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
+![MCP](https://img.shields.io/badge/MCP-stdio-purple.svg)
+
+A [Model Context Protocol](https://modelcontextprotocol.io/) server that exposes Odoo ERP data and actions as tools for AI agents in Cursor, Claude Desktop, and other MCP clients.
+
+**Author:** [Petr Stichauer](https://github.com/PetrStichauer)
+
+## Why this server?
+
+Instead of teaching an agent raw Odoo XML-RPC, this server provides typed MCP tools with safe defaults: connection profiles, read-only mode, result limits, and sanitized error messages. Point your agent at customers, projects, tasks, or any Odoo model with minimal setup.
 
 ## Features
 
-- **search_partners** - Search customers/contacts by name, email, or company status
-- **get_partner** - Get detailed information about a specific partner
-- **create_task** - Create new project tasks with optional assignment and deadlines
-- **search_tasks** - List tasks with filters (project, user, state, priority)
-- **get_project** - Get detailed project information
+| Category | Tools |
+|----------|-------|
+| Connections | `list_connections`, `test_connection` |
+| Partners | `search_partners`, `get_partner` |
+| Projects & tasks | `get_project`, `search_tasks`, `create_task` |
+| Generic reads | `search_records`, `read_record`, `list_models` |
 
-## Installation
+All tools accept an optional `connection` parameter for multi-instance setups.
+
+## Quick start
 
 ```bash
-# Clone or create the project
-git clone <repository-url>
+git clone https://github.com/PetrStichauer/odoo-mcp-server.git
 cd odoo-mcp-server
-
-# Install with pip
 pip install -e .
 
-# Or install in development mode
-pip install -e ".[dev]"
+# Interactive setup (stores API key locally with secure permissions)
+odoo-mcp-server configure
+
+# Verify authentication
+odoo-mcp-server test
+
+# Run the MCP server (stdio)
+odoo-mcp-server
 ```
+
+### Getting an Odoo API key
+
+1. Log in to your Odoo instance
+2. Open your user profile → Preferences / Account Security
+3. Under **API Keys**, create a new key and copy it
+4. Use a dedicated Odoo user with least-privilege access
 
 ## Configuration
 
-Create a `.env` file or set environment variables:
+### Named connection profiles (recommended)
+
+Profiles are stored at `~/.config/odoo-mcp-server/connections.json` (mode `0600`, directory `0700`).
+
+```bash
+# Add or update a profile
+odoo-mcp-server configure
+
+# List profiles (no secrets shown)
+odoo-mcp-server configure --list
+
+# Test a specific profile
+odoo-mcp-server test --connection staging
+```
+
+Set the active profile when starting the server:
+
+```bash
+export ODOO_CONNECTION=production
+odoo-mcp-server
+```
+
+Override the profiles file path:
+
+```bash
+export ODOO_MCP_CONFIG=/path/to/connections.json
+```
+
+### Environment variables (CI / single connection)
+
+Set all four variables to use an implicit `"env"` connection (overrides profiles):
 
 ```env
 ODOO_URL=https://your-odoo-instance.com
 ODOO_DB=your_database_name
 ODOO_USER=your_username
-ODOO_API_KEY=your_api_key_or_password
+ODOO_API_KEY=your_api_key
 ```
 
-### Getting Odoo API Key
+See [`.env.example`](.env.example) for all options including `ODOO_READONLY`.
 
-1. Log in to your Odoo instance
-2. Go to your user profile (top right menu)
-3. Click "Preferences" / "Account Security"
-4. Under "API Keys", click "New API Key"
-5. Give it a name and copy the generated key
+### Read-only mode
 
-## Usage
-
-### Running the Server
+Block write tools (`create_task`, future writes) for read-only agents:
 
 ```bash
-# With environment variables loaded from .env
-python -m odoo_mcp_server.server
-
-# Or use the console script
-odoo-mcp-server
+export ODOO_READONLY=true
 ```
 
-### Using with Claude Desktop
+## MCP client setup
 
-Add to your Claude Desktop config (`~/.config/claude/claude_desktop_config.json`):
+### Cursor
+
+Add to `.cursor/mcp.json` (see [`examples/cursor-mcp.json`](examples/cursor-mcp.json)):
 
 ```json
 {
   "mcpServers": {
     "odoo": {
-      "command": "python",
-      "args": ["-m", "odoo_mcp_server.server"],
+      "command": "odoo-mcp-server",
       "env": {
-        "ODOO_URL": "https://your-odoo-instance.com",
-        "ODOO_DB": "your_database_name",
-        "ODOO_USER": "your_username",
-        "ODOO_API_KEY": "your_api_key"
+        "ODOO_CONNECTION": "production"
       }
     }
   }
 }
 ```
 
-### Using with Other MCP Clients
+**Multiple Odoo instances:** add another entry with a different name and `ODOO_CONNECTION` value — same install, different profile.
 
-The server uses stdio transport, so it works with any MCP client:
+### Claude Desktop
 
-```python
-from mcp import ClientSession, StdioServerParameters
-from mcp.client.stdio import stdio_client
+Add to `~/Library/Application Support/Claude/claude_desktop_config.json` on macOS (see [`examples/claude_desktop_config.json`](examples/claude_desktop_config.json)):
 
-server_params = StdioServerParameters(
-    command="python",
-    args=["-m", "odoo_mcp_server.server"],
-    env={
-        "ODOO_URL": "https://your-odoo-instance.com",
-        "ODOO_DB": "your_database_name",
-        "ODOO_USER": "your_username",
-        "ODOO_API_KEY": "your_api_key",
-    },
-)
-
-async with stdio_client(server_params) as (read, write):
-    async with ClientSession(read, write) as session:
-        await session.initialize()
-        # Use the session to call tools
-```
-
-## Available Tools
-
-### search_partners
-
-Search for customers/contacts in Odoo.
-
-**Parameters:**
-- `name` (string, optional): Name or partial name to search for
-- `email` (string, optional): Email address to search for
-- `is_company` (boolean, optional): Filter by company vs individual
-- `limit` (integer, default: 20): Maximum number of results
-
-**Example:**
 ```json
 {
-  "name": "Acme",
-  "is_company": true,
-  "limit": 10
+  "mcpServers": {
+    "odoo": {
+      "command": "odoo-mcp-server",
+      "env": {
+        "ODOO_CONNECTION": "production"
+      }
+    }
+  }
 }
 ```
 
-### get_partner
+## Tool reference
 
-Get detailed information about a specific partner.
+### Connection tools
 
-**Parameters:**
-- `partner_id` (integer, required): ID of the partner to retrieve
+- **`list_connections`** — profile names, active/default connection, URLs (no credentials)
+- **`test_connection`** — authenticate and return server version info
 
-**Example:**
-```json
-{
-  "partner_id": 42
-}
-```
+### Partner tools
 
-### create_task
+- **`search_partners`** — filter by name, email, company flag
+- **`get_partner`** — full partner details by ID
 
-Create a new project task.
+### Project & task tools
 
-**Parameters:**
-- `name` (string, required): Name/title of the task
-- `project_id` (integer, optional): ID of the project
-- `user_id` (integer, optional): ID of the assigned user
-- `partner_id` (integer, optional): ID of the related customer
-- `description` (string, optional): Task description
-- `priority` (string, optional): Priority - "0" (low) or "1" (high)
-- `deadline` (string, optional): Deadline date in YYYY-MM-DD format
+- **`get_project`** — project details by ID
+- **`search_tasks`** — filter by project, user, state, priority
+- **`create_task`** — create a task (blocked when `ODOO_READONLY=true`)
 
-**Example:**
-```json
-{
-  "name": "Review Q4 financials",
-  "project_id": 5,
-  "user_id": 3,
-  "priority": "1",
-  "deadline": "2026-03-15"
-}
-```
+### Generic read tools
 
-### search_tasks
+- **`search_records`** — `search_read` on any model with domain, fields, limit (max 100), order
+- **`read_record`** — read one record by ID
+- **`list_models`** — list non-transient models from `ir.model`
 
-Search for project tasks with filters.
+All search tools enforce a maximum of **100 records** and **20 domain clauses**.
 
-**Parameters:**
-- `name` (string, optional): Task name to search for
-- `project_id` (integer, optional): Filter by project ID
-- `user_id` (integer, optional): Filter by assigned user ID
-- `state` (string, optional): Filter by state - "draft", "open", "pending", "cancelled", "done"
-- `priority` (string, optional): Filter by priority - "0" (low) or "1" (high)
-- `limit` (integer, default: 20): Maximum number of results
+## Odoo compatibility
 
-**Example:**
-```json
-{
-  "project_id": 5,
-  "state": "open",
-  "priority": "1",
-  "limit": 10
-}
-```
+Tested against Odoo **16 / 17 / 18 Community** via XML-RPC.
 
-### get_project
-
-Get project information by ID.
-
-**Parameters:**
-- `project_id` (integer, required): ID of the project to retrieve
-
-**Example:**
-```json
-{
-  "project_id": 5
-}
-```
+Note: `project.task` assignee field changed in newer versions (`user_ids` vs legacy `user_id`). This server uses `user_ids` for Odoo 17+.
 
 ## Development
 
 ```bash
-# Install dev dependencies
 pip install -e ".[dev]"
-
-# Run linting
-ruff check src/
-black src/
-
-# Run tests
+ruff check src/ tests/
 pytest
 ```
 
-## Requirements
+See [CONTRIBUTING.md](CONTRIBUTING.md) for pull request guidelines.
 
-- Python 3.10+
-- MCP SDK (`mcp>=1.0.0`)
-- python-dotenv (for environment configuration)
-- Access to an Odoo instance with XML-RPC enabled
+## Security
 
-## Security Notes
-
-- Store your API key securely (use environment variables, not hardcoded values)
-- Use Odoo API keys instead of passwords when possible
-- Consider restricting the Odoo user's permissions to only what's necessary
-- The server connects via XML-RPC over HTTPS (ensure your Odoo uses SSL)
+- Never commit `.env` or API keys — see [SECURITY.md](SECURITY.md)
+- Profiles store API keys in plaintext locally (standard for MCP); use env vars on shared machines
+- Use least-privilege Odoo users and `ODOO_READONLY` when agents should not write data
 
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE). Copyright © 2026 Petr Stichauer.

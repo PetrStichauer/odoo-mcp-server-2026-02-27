@@ -4,35 +4,43 @@ build-backend = "hatchling.build"
 
 [project]
 name = "odoo-mcp-server"
-version = "0.1.0"
+version = "0.2.0"
 description = "MCP Server for Odoo ERP - Expose Odoo functionality as AI tools"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
 authors = [
-    {name = "Petr"}
+    {name = "Petr Stichauer", email = "petr.stichauer@gmail.com"}
 ]
 dependencies = [
     "mcp>=1.0.0",
     "python-dotenv>=1.0.0",
 ]
 
+[project.urls]
+Homepage = "https://github.com/PetrStichauer/odoo-mcp-server"
+Repository = "https://github.com/PetrStichauer/odoo-mcp-server"
+Issues = "https://github.com/PetrStichauer/odoo-mcp-server/issues"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0.0",
-    "black>=23.0.0",
+    "pytest-asyncio>=0.23.0",
     "ruff>=0.1.0",
 ]
 
 [project.scripts]
-odoo-mcp-server = "odoo_mcp_server.server:main"
+odoo-mcp-server = "odoo_mcp_server.cli:main"
 
-[tool.black]
-line-length = 100
-target-version = ['py310']
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
 select = ["E", "F", "I", "W"]
 ignore = ["E501"]
 
